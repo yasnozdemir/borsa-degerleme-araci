@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Stock FutureSight Pro", layout="wide")
 
-# Görseldeki Tasarım İçin CSS
+# Tasarım - Görseldeki Koyu Tema
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -13,7 +13,6 @@ st.markdown("""
         border-radius: 12px; margin-bottom: 15px;
         border-left: 6px solid #3d4450; color: white;
     }
-    .metric-title { color: #aeb4be; font-size: 16px; }
     .metric-value { color: #00d4ff; font-size: 32px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
@@ -28,7 +27,7 @@ if ticker:
         current_price = info.get('currentPrice', 1.0)
         forward_eps = info.get('forwardEps', 1.0)
         
-        # Sidebar Girişleri (Görseldeki Çarpanlar)
+        # Sidebar Girişleri
         st.sidebar.write("2-Year-Ahead P/E Ratios")
         low_pe = st.sidebar.number_input("Low", value=15.3)
         mid_pe = st.sidebar.number_input("Mid", value=18.4)
@@ -45,13 +44,11 @@ if ticker:
 
         with col1:
             st.markdown(f"### Valuation Summary for {ticker}")
-            st.markdown(f"<div class='metric-title'>Calculated Current Price</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='metric-value'>${current_price:.2f}</div>", unsafe_allow_html=True)
             
             st.write("### Price Level Visualization")
-            # --- HATA DÜZELTİLMİŞ GRAFİK ALANI ---
+            # --- HATASIZ GRAFİK ---
             fig = go.Figure()
-            
             scenarios = ['High', 'Mid', 'Low', 'Current']
             values = [high_val, mid_val, low_val, current_price]
             colors = ['#00e5ff', '#9d4edd', '#ff9100', '#6c757d']
@@ -61,18 +58,34 @@ if ticker:
                 x=values,
                 orientation='h',
                 marker=dict(color=colors),
-                width=0.6,
                 text=[f"${v:.2f}" for v in values],
-                textposition='outside',
-                textfont=dict(color='white')
+                textposition='outside'
             ))
             
             fig.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(tickfont=dict(color="white", size=14)),
-                height=350,
-                margin=dict(l=10, r=50, t=10, b=10)
+                yaxis=dict(tickfont=dict(color="white")),
+                margin=dict(l=10, r=50, t=10, b=10),
+                height=300
             )
-            st.plotly_chart(fig, use_
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.write("### 2-Year Scenarios")
+            for name, val, color in [("Low", low_val, "#ff9100"), ("Mid", mid_val, "#9d4edd"), ("High", high_val, "#00e5ff")]:
+                upside = ((val / current_price) - 1) * 100
+                st.markdown(f"""
+                    <div class="scenario-card" style="border-left-color: {color};">
+                        <div style="display: flex; justify-content: space-between;">
+                            <b>{name} Case</b> <b>${val:.2f}</b>
+                        </div>
+                        <div style="text-align: right; color: {'#00ff00' if upside > 0 else '#ff4b4b'};">
+                            {'↑' if upside > 0 else '↓'} {abs(upside):.2f}%
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Hata: {e}")

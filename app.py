@@ -1,42 +1,62 @@
 import streamlit as st
 import yfinance as yf
+import plotly.graph_objects as go
 
-st.title("🇺🇸 ABD Borsası Değerleme Aracı")
-st.write("Şirket kâr tahminleri ve çarpanlara göre fiyat analizi.")
+# Sayfa Genişlik Ayarı
+st.set_page_config(page_title="Stock FutureSight Pro", layout="wide")
 
-# 1. Kullanıcı Girişi
-ticker = st.text_input("Hisse Kodunu Giriniz (Örn: AAPL, MSFT):", "AAPL").upper()
-target_pe = st.slider("Hedef F/K (P/E) Çarpanı Seçin:", 5, 50, 20)
+# Tasarım - Koyu Tema Dokunuşu
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #1e2227; padding: 15px; border-radius: 10px; border: 1px solid #30363d; }
+    </style>
+""", unsafe_allow_html=True)
 
-if ticker:
+st.title("📊 Stock FutureSight: Senaryo Analizi")
+
+# Sidebar - Girişler
+st.sidebar.header("🔍 Şirket Seçimi")
+ticker_symbol = st.sidebar.text_input("Ticker (Hisse Kodu):", "GOOGL").upper()
+
+if ticker_symbol:
     try:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker_symbol)
         info = stock.info
+        current_price = info.get('currentPrice', 1)
         
-        # 2. Veri Çekme
-        current_price = info.get('currentPrice', 0)
-        forward_eps = info.get('forwardEps', 0)
-        company_name = info.get('longName', 'Bilinmeyen Şirket')
-        
-        st.subheader(f"{company_name} Analizi")
-        
-        # 3. Hesaplama
-        # Formül: Tahmini Değer = Beklenen Hisse Başı Kâr * Hedef Çarpan
-        estimated_value = forward_eps * target_pe
-        upside = ((estimated_value / current_price) - 1) * 100
-        
-        # 4. Arayüzde Gösterme
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Güncel Fiyat", f"${current_price}")
-        col2.metric("Beklenen EPS (1Y)", f"${forward_eps}")
-        col3.metric("Tahmini Değer", f"${estimated_value:.2f}")
+        # Finansal Verileri Çekme (CFO ve EPS)
+        cash_flow = stock.cashflow
+        # En son Operasyonel Nakit Akışı (CFO)
+        latest_cfo = cash_flow.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cash_flow.index else 0
+        shares_outstanding = info.get('sharesOutstanding', 1)
+        cfo_per_share = latest_cfo / shares_outstanding
+        forward_eps = info.get('forwardEps', 1)
 
-        if upside > 0:
-            st.success(f"Potansiyel Getiri: %{upside:.2f}")
-        else:
-            st.error(f"Potansiyel Kayıp/Aşırı Değerleme: %{upside:.2f}")
-            
-    except Exception as e:
-        st.error(f"Veri çekilirken bir hata oluştu. Ticker'ı kontrol edin. Hata: {e}")
+        st.sidebar.divider()
+        st.sidebar.header("⚙️ Senaryo Parametreleri")
+        val_metric = st.sidebar.selectbox("Değerleme Metriği:", ["Forward EPS", "CFO Per Share"])
+        base_val = forward_eps if val_metric == "Forward EPS" else cfo_per_share
+        
+        # Çarpan Girişleri (Görseldeki gibi)
+        st.sidebar.write(f"2 Yıllık {val_metric} Çarpanları:")
+        low_mult = st.sidebar.number_input("Low (Kötü)", value=15.0)
+        mid_mult = st.sidebar.number_input("Mid (Normal)", value=18.4)
+        high_mult = st.sidebar.number_input("High (İyi)", value=21.8)
+        
+        # 2 Yıllık Tahmini Büyüme (Yıllık %10 varsayılan)
+        growth_rate = st.sidebar.slider("Yıllık Tahmini Büyüme (%)", 0, 50, 10) / 100
+        projected_val = base_val * ((1 + growth_rate) ** 2)
 
-st.info("Not: Bu araç sadece matematiksel bir tahmindir, yatırım tavsiyesi değildir.")
+        # HESAPLAMALAR
+        low_target = projected_val * low_mult
+        mid_target = projected_val * mid_mult
+        high_target = projected_val * high_mult
+
+        # ANA PANEL
+        col_main1, col_main2 = st.columns([1, 1.5])
+
+        with col_main1:
+            st.subheader(f"Valuation Summary for {ticker_symbol}")
+            st.write(f"Seçilen Metrik: {val_metric}")
+            st.metric("Mevcut Fiyat", f"${current_price:.2
